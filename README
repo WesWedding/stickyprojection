@@ -1,6 +1,7 @@
-This module has depends heavily on the geocode module.  This module, in turn, requires
-the GeoPHP library to be insalled using the Libraries API.
+This module has depends heavily on the geocode and geofield modules.  This module, in turn, requires
+the GeoPHP library to be insalled using the Libraries API.  
 
 https://github.com/phayes/geocode
+http://drupal.org/project/geofield
 https://github.com/phayes/geoPHP
 http://drupal.org/project/libraries

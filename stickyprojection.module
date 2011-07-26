@@ -32,7 +32,22 @@ function stickyprojection_field_formatter_info() {
  * Implements hook_field_formatter_view()
  */
 function stickyprojection_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
-   return array();
+   $element = array();
+   $settings = $display['settings'];
+   
+   switch($display['type']) {
+      case 'stickyprojection_formatter':
+         foreach($items as $delta => $item) {
+            $element[$delta] = array(
+               '#markup' => '<b>XY: '.$item['x_value'].', '.$item['y_value'].'</b>',
+            );
+         }
+         break;
+      default:
+         //do nothing
+         break;   
+   }
+   return $element;
 }
 
 /**
