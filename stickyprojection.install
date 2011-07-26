@@ -1,0 +1,11 @@
+<?php
+
+function stickyprojection_field_schema($field) {
+  $columns = array(
+    'x_value' => array('type' => 'float', 'not null' => FALSE),
+    'y_value' => array('type' => 'float', 'not null' => FALSE),
+  );
+  return array(
+    'columns' => $columns,
+  );
+}

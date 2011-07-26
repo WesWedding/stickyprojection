@@ -1,0 +1,5 @@
+; $Id$
+name = Sticky Projection
+description = Take a point from a geocode field and project it to an XY pixel value
+core = 7.x
+dependencies[] = geocode

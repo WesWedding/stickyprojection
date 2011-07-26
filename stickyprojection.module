@@ -1,0 +1,345 @@
+<?php
+
+/**
+ * Implements hook_field_info().
+ */
+function stickyprojection_field_info() {
+  return array(
+    'stickyprojection' => array(
+      'label' => t('Pixel Projection'),
+      'description' => t('This field takes a point from a geocode field and projects it onto an image.'),
+      'default_widget' => 'stickyprojection_widget',
+      'default_formatter' => 'stickyprojection_formatter',
+    ),
+  );
+}
+
+
+/**
+ *  Impelements hook_field_formatter_info()
+ */
+function stickyprojection_field_formatter_info() {
+   return array(
+      'stickyprojection_formatter' => array(
+         'label' => 'XY Coordinates',
+         'description' => 'Displays the XY coordinates of the projection.',
+         'field types' => array('stickyprojection'),      
+      ),   
+   );   
+}
+
+/**
+ * Implements hook_field_formatter_view()
+ */
+function stickyprojection_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+   return array();
+}
+
+/**
+ * Implements field_widget_settings_form().
+ */
+function stickyprojection_field_widget_settings_form($this_field, $instance) {
+   $settings = $instance['widget']['settings'];
+   $all_fields = field_info_fields();
+   $entity_fields = field_info_instances($instance['entity_type'], $instance['bundle']);
+   
+   $valid_fields = array();
+   
+   
+// Get a list of all valid fields that we both support and are part of this entity
+  foreach ($all_fields as $field) {
+    if (array_key_exists($field['field_name'], $entity_fields)) {
+      if (in_array($field['type'], array('geofield')) && ($field['field_name'] != $this_field['field_name'])) {
+        $valid_fields[$field['field_name']] = $entity_fields[$field['field_name']]['label'];
+      }
+    }
+  }
+  
+   //Someday we'll support other projections, maybe
+   $usable_projections = array(
+      'mercator',   
+   );
+  
+  
+   $form['stickyprojection_source'] = array(
+    '#type' => 'select',
+    '#title' => t('Pixel location from field'),
+    '#default_value' => isset($settings['stickyprojection_source']) ? $settings['stickyprojection_source']: '',
+    '#options' => $valid_fields,
+    '#description' => t('Select which field you would like project from.'),
+    '#required' => TRUE,
+   );
+   
+   $form['stickyprojection_projection_used'] = array(
+    '#type' => 'select',
+    '#title' => t('Projection to use'),
+    '#default_value' => isset($settings['stickyprojection_projection_used']) ? $settings['stickyprojection_projection_used']: '',
+    '#options' => $usable_projections,
+    '#description' => t('Select the projection used on the map.'),
+    '#required' => TRUE,
+   );
+   
+   $form['stickyprojection_image_height'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Map image height'),
+      '#default_value' => isset($settings['stickyprojection_image_height']) ? $settings['stickyprojection_image_height']: '',
+      '#description' => t('Specify the height (in pixels) of the map being used'),
+      '#required' => TRUE,
+   );
+   $form['stickyprojection_image_width'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Map image width'),
+      '#default_value' => isset($settings['stickyprojection_image_width']) ? $settings['stickyprojection_image_width']: '',
+      '#description' => t('Specify the width (in pixels) of the map being used'),
+      '#required' => TRUE,
+   );
+   $form['stickyprojection_map_top_lat'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Max latitude'),
+      '#default_value' => isset($settings['stickyprojection_map_top_lat']) ? $settings['stickyprojection_map_top_lat']: '',
+      '#description' => t("Specify the map's topmost latitude (in degrees).  If locations seem off slightly this number might need to be tweaked."),
+      '#required' => TRUE,
+   );
+   $form['stickyprojection_map_bot_lat'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Minimum latitude'),
+      '#default_value' => isset($settings['stickyprojection_map_bot_lat']) ? $settings['stickyprojection_map_bot_lat']: '',
+      '#description' => t("Specify the map's lowermost latitude (in degrees).  If locations seem off slightly this number might need to be tweaked."),
+      '#required' => TRUE,
+   );
+   $form['stickyprojection_map_left_lon'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Minimum longitude'),
+      '#default_value' => isset($settings['stickyprojection_map_left_lon']) ? $settings['stickyprojection_map_left_lon']: '',
+      '#description' => t("Specify the map's lowest (usually western) latitude (in degrees).  If locations seem off slightly this number might need to be tweaked."),
+      '#required' => TRUE,
+   );
+   $form['stickyprojection_map_right_lon'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Minimum longitude'),
+      '#default_value' => isset($settings['stickyprojection_map_right_lon']) ? $settings['stickyprojection_map_right_lon']: '',
+      '#description' => t("Specify the map's highest (usually eastern) latitude (in degrees).  If locations seem off slightly this number might need to be tweaked."),
+      '#required' => TRUE,
+   );
+  return $form;
+}
+
+
+function stickyprojection_field_widget_info() {
+   return array(
+      'stickyprojection_field' => array(
+         'label' => t('Info from a geocode field'),
+         'field types' => array('stickyprojection'),
+         'settings' => array(
+            'stickyprojection_source' => '',
+            'stickyprojection_projection_used' => '',
+            'stickyprojection_image_height' => '',
+            'stickyprojection_image_width' => '',
+            'stickyprojection_map_top_lat' => '',
+            'stickyprojection_map_bot_lat' => '',
+            'stickyprojection_map_left_lon' => '',
+            'stickyprojection_map_right_lon' => '',
+         ),
+      ),   
+   );
+}
+
+function stickyprojection_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+   $element['stickyprojection_source'] = array(
+   '#type' => 'hidden',
+   '#value' => isset($instance['widget']['settings']['stickyprojection_source']) ? $instance['widget']['settings']['stickyprojection_source'] : '',
+  );
+  
+   $element['stickyprojection_target'] = array(
+   '#type' => 'hidden',
+   '#value' => $instance['field_name'],
+  );
+  
+  $element['validate'] = array('#element_validate' => array('stickyprojection_field_validate_callback'),);
+  //dsm($form_state);
+  return $element;
+}
+
+/***
+ * Called by 'validate' element on the widget form
+ *
+ * We're not using the usual Field API validate function because we need to act on and modify
+ * data in other fields.  We're going to find our related geocode fields, get the lat/lon from
+ * them, and then do our projection math.
+ * 
+ * This is also where the X/Y pixels are inserted into the $form_state, there is no form element
+ * that saves this information.
+ *
+ ***/
+
+function stickyprojection_field_validate_callback($element, &$form_state) {
+   if (!isset($form_state['node']))
+      return;
+   else $node = $form_state['node'];
+   
+   $langcode = $node->language;
+      
+   $fields = $form_state['field'];
+   $projection_fields = array();
+   $geocode_fields = array();
+   foreach($fields as $key => $field) {  //todo: put in function?
+      if ($field[$langcode]['field']['type'] == 'stickyprojection') {
+               $projection_fields[$key] = $field;
+      }
+   }
+   foreach($projection_fields as $key => $field) {  //todo: put in function?
+      //Grab and store the field names for the related geofields
+      $geocode_field_name = $field[$langcode]['instance']['widget']['settings']['stickyprojection_source'];
+      $geocode_fields[$geocode_field_name]['dest'] = $key;
+      $geocode_fields[$geocode_field_name]['field'] = $fields[$geocode_field_name];
+   }
+   $lat = 0;
+   $lon = 0;
+   foreach($geocode_fields as $key => $geofield) {
+      $lon = $form_state['values'][$key][$langcode][0]['lon'];
+      $lat = $form_state['values'][$key][$langcode][0]['lat'];
+      $projection_settings = $projection_fields[$geofield['dest']][$langcode]['instance']['widget']['settings'];
+      $xy = array('x' => 0, 'y' => 0);
+      
+      $projection = $projection_settings['stickyprojection_projection_used'];
+      $imageWidth = $projection_settings['stickyprojection_image_width'];
+      $imageHeight = $projection_settings['stickyprojection_image_height'];
+      $latTop = $projection_settings['stickyprojection_map_top_lat'];
+      $latBot = $projection_settings['stickyprojection_map_bot_lat'];
+      $lonLeft = $projection_settings['stickyprojection_map_left_lon'];
+      $lonRight = $projection_settings['stickyprojection_map_right_lon'];
+      switch($projection) {
+         case "0": //mercator
+            $xy = stickyprojection_mercatorProjectPoint("", $lat, $lon, $imageWidth, $imageHeight, $latTop, $latBot, $lonLeft, $lonRight);
+            break;
+         default:
+            //do nada
+            break;
+      }
+      $form_state['values'][$geofield['dest']][$langcode][0]['x_value'] = $xy['x'];
+      $form_state['values'][$geofield['dest']][$langcode][0]['y_value'] = $xy['y'];
+   }
+}
+
+/***
+ * Implements hook_field_validate()
+ *
+ *  This is really handled in stickyprojection_field_validate_callback()
+ *
+ *
+ ***/
+function stickyprojection_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+   switch ($instance['widget']['type']) {
+      case 'stickyprojection_field':
+         //grab the point in the geofield!
+         foreach($items as $delta) {
+            //do nothing (for now).  Maybe make sure the point will actually fit on the map
+         }
+         break;
+   }
+}
+
+
+/***
+*  in:   $name (string),
+         $lat(float), 
+         $lon(float),
+         $imageWidth(float),
+         $imageheight(float),
+         $latBoundTop(float) - degrees,
+         $latBoundBottom(float) - degrees
+         $lonBoundLeft(float) - degrees,
+         $lonBoundRight(float) - degrees,
+         
+   
+   out:  $xy - array with 'x' index and 'y' index with the values corresponding to the pixel
+         
+         This function produces the XY coordinates of a pixel that represents a specific latitude/longitude
+         on a given image.  This happens in two steps.  This function can handle an entire world map
+         or just a specific portion of the world map.
+         
+         Reminder: latitude is up/down, lon is left/right
+         
+         Step 1: This function projects a longitude and latitude using Mercator Projection into an XY coordinate system
+         
+         Step 2: It then scales the XY coordinate plane to the XY dimensions of the image and the lat/lon constraints of the map
+         
+***/
+
+function stickyprojection_mercatorProjectPoint($name = "Middle", $lat = 0, $lon = 0, $imageWidth = 86, $imageHeight = 93, $latBoundTop = 30, $latBoundBottom = 15, $lonBoundLeft = -165, $lonBoundRight = -150) {
+   
+   
+   //Convert Lat/Long to X/Y coordinates on a plane
+   //Math requires radians
+   $scale = 6378.1; //km
+   $lon0 = $lonBoundLeft; //degrees
+   
+   $latR = deg2rad($lat);
+   $lonR = deg2rad($lon);
+   $lon0R = deg2rad($lon0);
+   $latMidR = 0;
+   
+   
+   $lonBoundRightR = deg2rad($lonBoundRight);
+   $latBoundBottomR = deg2rad($latBoundBottom);
+   $latBoundTopR = deg2rad($latBoundTop);
+   
+   $coordX = ($lonR - $lon0R) * $scale;
+   $coordY = log((sin($latR) + 1)/cos($latR)) * $scale;
+   
+   //end of conversion to X/Y
+   
+   //Now from X/Y to pixels
+   
+   //Getting the scaling from the XY to Pixels
+   $xMax = ($lonBoundRightR - $lon0R) * $scale;
+   $yMax = log((sin($latBoundTopR) + 1)/cos($latBoundTopR)) * $scale;
+   $yMin = log((sin($latBoundBottomR) + 1)/cos($latBoundBottomR)) * $scale;
+   $xScale = $imageWidth/$xMax;
+   $yScale = $imageHeight/(($yMax - $yMin)/2);
+   
+   $botLat = log((sin($latBoundBottomR) + 1)/cos($latBoundBottomR));
+   $topLat = log((sin($latBoundTopR) + 1)/cos($latBoundTopR));
+   $midDisplace = abs($latBoundTop) - abs($latBoundBottom);
+   $midDisplaceR = deg2rad($midDisplace);
+   $midAdjust = (log((sin($midDisplaceR) + 1)/cos($midDisplaceR)) - $botLat) * $scale * $yScale;
+   
+   /*
+      Find the position of the lat = 0 on the image.  This is necessary because the math for the Y
+      coordinate is based on setting the Y axis at the equator.
+      
+      The math is extremely simple if the image has equal latitudes on each side of the 
+      equator (just half the height).  However, if the map has unequal tops and bottoms we need
+      more complicated math.
+      
+      This could probably be handled without the if/else logic with simple formulas
+      but I couldn't figure them out so I had to rely on this crutch.  My crutch is to 
+      create an imaginary map image of equal proportions and find that middle pixel value
+      
+   */
+   if (abs($latBoundTop) != abs($latBoundBottom)) {     
+      $falseMapHeight = max(abs($latBoundTop), abs($latBoundBottom)) * 2;
+      $falseTop = deg2rad(max(abs($latBoundTop), abs($latBoundBottom)));
+      $falseBottom = -deg2rad(max(abs($latBoundTop), abs($latBoundBottom)));
+      $falseTopMax = log((sin($falseTop) + 1)/cos($falseTop)) * $scale;
+      $falseBottomMax = log((sin($falseBottom) + 1)/cos($falseBottom)) * $scale;
+      $falseTopY = $falseTopMax * $yScale / 2;
+      $falseBottomY = $falseBottomMax * $yScale / 2;
+      $imageMidY = ($falseTopY - $falseBottomY)/ 2;
+   } else {
+      $imageMidY = $imageHeight/2;
+   }
+   
+   //This is supposed to be where lat = 0 on the map represented by the image
+   $pixelX = $xScale * $coordX;
+   $pixelY = $imageMidY - ($yScale * $coordY/2);
+   
+   //print "pixelX: $pixelX  pixelY: $pixelY\n\n";
+   
+   return array('x'=> $pixelX, 'y' => $pixelY);
+}
+
+function stickyprojection_field_is_empty($item, $field) {
+   return false;
+}
+
